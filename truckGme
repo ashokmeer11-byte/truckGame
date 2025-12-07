@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Responsive Truck Game</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Responsive Game Container */
+#game {
+    width: 90vw;          /* 90% of viewport width */
+    height: calc(90vw * 16 / 9);  /* maintain 9:16 ratio (width * 16/9) */
+    max-height: 95vh;     /* max 95% of viewport height */
+    border: 4px solid #000;
+    position: relative;
+    overflow: hidden;
+    background: #222;
+}
+
+/* Roads */
+.road {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background: url("images/road.png") center/cover no-repeat;
+}
+
+/* Truck */
+#truck {
+    position: absolute;
+    background: url("images/truck.png") center/contain no-repeat;
+    z-index: 5;
+}
+
+/* Enemies */
+.enemy {
+    position: absolute;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    z-index: 4;
+}
+
+/* Fuel */
+.fuel {
+    position: absolute;
+    background: url("images/fuel.png") center/contain no-repeat;
+    z-index: 4;
+}
+
+/* Score */
+#score {
+    color: white;
+    font-size: 4vw;
+    position: absolute;
+    top: 2%;
+    left: 2%;
+    z-index: 20;
+}
+
+/* Fuel bar */
+#fuelBarOutline {
+    position: absolute;
+    top: 2%;
+    right: 2%;
+    width: 25%;
+    height: 3%;
+    border: 2px solid #fff;
+}
+#fuelBar {
+    width: 100%;
+    height: 100%;
+    background: limegreen;
+}
+
+/* MOBILE CONTROLS */
+#controls {
+    position: absolute;
+    bottom: 5%;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 5%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.controlBtn {
+    width: 12vw;
+    height: 12vw;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    border-radius: 50%;
+    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 6vw;
+    color: white;
+    user-select: none;
+}
+
+/* Loading Screen */
+#loadingScreen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loader {
+    width: 60px;
+    height: 60px;
+    border: 6px solid #333;
+    border-top: 6px solid #00ffea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Main Menu + Level Menu */
+#mainMenu, #levelMenu {
+    position: fixed;
+    inset: 0;
+    background: #111;
+    display: none;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    z-index: 999;
+}
+
+.title {
+    color: white;
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
+.menuBtn {
+    width: 200px;
+    height: 50px;
+    margin: 10px;
+    font-size: 20px;
+    border: none;
+    background: #00ffaa;
+    border-radius: 10px;
+}
+</style>
+</head>
+<body>
+<!-- PAUSE + MUSIC CONTROLS -->
+<div id="pauseControls" style="position:absolute; top:2%; left:50%; transform:translateX(-50%); z-index:30; text-align:center; color:white;">
+    <button id="pauseBtn" style="font-size:4vw; padding:0.5vw 1vw;">⏸️</button>
+
+    <select id="musicSelect" style="font-size:3vw;">
+        <option value="none">No Music</option>
+        <option value="music/track1.mp3">Track 1</option>
+        <option value="music/track2.mp3">Track 2</option>
+        <option value="music/track3.mp3">Track 3</option>
+        <option value="music/track4.mp3">Track 4</option>
+        <option value="music/track5.mp3">Track 5</option>
+    </select>
+</div>
+
+<!-- LOADING SCREEN -->
+<div id="loadingScreen">
+    <div class="loader"></div>
+    <p style="color:white; margin-top:10px;">Loading...</p>
+</div>
+
+<!-- MAIN MENU -->
+<div id="mainMenu">
+    <h1 class="title">ULTIMATE TRUCK GAME</h1>
+    <button class="menuBtn" onclick="openLevels()">PLAY</button>
+    <button class="menuBtn" onclick="exitGame()">EXIT</button>
+</div>
+
+<!-- LEVEL SELECT MENU -->
+<div id="levelMenu">
+    <h2 class="title">SELECT LEVEL</h2>
+    <button class="menuBtn" onclick="startLevel(1)">LEVEL 1</button>
+    <button class="menuBtn" onclick="startLevel(2)">LEVEL 2</button>
+    <button class="menuBtn" onclick="startLevel(3)">LEVEL 3</button>
+    <button class="menuBtn" onclick="backToMenu()">BACK</button>
+</div>
+
+<!-- GAME (hidden until a level starts) -->
+<div id="game" style="display:none;">
+    <div id="road1" class="road"></div>
+    <div id="road2" class="road"></div>
+
+    <div id="truck"></div>
+
+    <div id="score">Score: 0</div>
+
+    <div id="fuelBarOutline"><div id="fuelBar"></div></div>
+
+    <div id="controls">
+        <div id="leftBtn" class="controlBtn">◀</div>
+        <div id="rightBtn" class="controlBtn">▶</div>
+    </div>
+</div>
+
+<script>
+/* Show Loading Screen, then Main Menu */
+window.onload = () => {
+    setTimeout(() => {
+        document.getElementById("loadingScreen").style.display = "none";
+        document.getElementById("mainMenu").style.display = "flex";
+    }, 1200); // short loading
+};
+
+function openLevels() {
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("levelMenu").style.display = "flex";
+}
+
+function backToMenu() {
+    document.getElementById("levelMenu").style.display = "none";
+    document.getElementById("mainMenu").style.display = "flex";
+}
+
+function exitGame() {
+    alert("Exit not supported on browser.\nIn APK this will close the app.");
+}
+
+/* default level values so startLevel can set them */
+window.spawnRate = 1100;
+window.enemySpeed = 5;
+
+function startLevel(level) {
+    document.getElementById("levelMenu").style.display = "none";
+    document.getElementById("game").style.display = "block";
+
+    // Set difficulty based on level
+    if (level === 1) {
+        window.enemySpeed = 5;
+        window.spawnRate = 1100;
+    } else if (level === 2) {
+        window.enemySpeed = 7;
+        window.spawnRate = 900;
+    } else if (level === 3) {
+        window.enemySpeed = 9;
+        window.spawnRate = 700;
+    }
+
+    // Start game now
+    startGame();
+}
+</script>
+
+<script>
+let paused = false;
+let bgMusic = new Audio();
+bgMusic.loop = true;
+
+/* Pause Button */
+document.getElementById("pauseBtn").onclick = () => {
+    paused = !paused;
+    document.getElementById("pauseBtn").textContent = paused ? "▶️" : "⏸️";
+    if (paused) bgMusic.pause();
+    else bgMusic.play();
+};
+
+/* Music Selector */
+const musicSelect = document.getElementById("musicSelect");
+musicSelect.addEventListener("change", function() {
+    const val = this.value;
+    if(val === "none") { bgMusic.pause(); bgMusic.currentTime = 0; return; }
+    // change only when src differs
+    try {
+        if (!bgMusic.src.includes(val)) {
+            bgMusic.src = val;
+            if(!paused) bgMusic.play();
+        }
+    } catch(e){ bgMusic.src = val; if(!paused) bgMusic.play(); }
+});
+
+const game = document.getElementById("game");
+const truck = document.getElementById("truck");
+const road1 = document.getElementById("road1");
+const road2 = document.getElementById("road2");
+
+let enemies = [], fuels = [];
+let score = 0, fuel = 100;
+let crashed = false;
+let keys = {};
+
+const crashSound = new Audio("music/crash.mp3"); // adjust path if needed
+
+/* Responsive dimensions */
+let GAME_WIDTH = 0, GAME_HEIGHT = 0;
+let TRUCK_WIDTH = 0, TRUCK_HEIGHT = 0;
+let ENEMY_WIDTH = 0, ENEMY_HEIGHT = 0;
+let FUEL_SIZE = 0;
+
+function updateSizes() {
+    // if game is hidden (display:none) clientWidth will be 0 - guard against that
+    const gw = game.clientWidth || (window.innerWidth * 0.9);
+    GAME_WIDTH = gw;
+    // compute height exactly as CSS: height = width * 16/9
+    GAME_HEIGHT = Math.min(window.innerHeight * 0.95, GAME_WIDTH * 16 / 9);
+
+    TRUCK_WIDTH = GAME_WIDTH * 0.15;
+    TRUCK_HEIGHT = GAME_HEIGHT * 0.16;
+    ENEMY_WIDTH = TRUCK_WIDTH;
+    ENEMY_HEIGHT = TRUCK_HEIGHT;
+    FUEL_SIZE = GAME_WIDTH * 0.1;
+
+    // apply sizes (truck element only; enemies/fuel are sized on creation)
+    truck.style.width = TRUCK_WIDTH + "px";
+    truck.style.height = TRUCK_HEIGHT + "px";
+
+    // ensure roads cover and reset their top if needed (the scroll logic will set them)
+    road1.style.width = GAME_WIDTH + "px";
+    road1.style.height = GAME_HEIGHT + "px";
+    road2.style.width = GAME_WIDTH + "px";
+    road2.style.height = GAME_HEIGHT + "px";
+}
+
+window.addEventListener("resize", () => {
+    updateSizes();
+    // reposition truck if needed so it's inside bounds
+    truckX = Math.max(0, Math.min(GAME_WIDTH - TRUCK_WIDTH, truckX));
+    truckY = Math.max(0, Math.min(GAME_HEIGHT - TRUCK_HEIGHT, truckY));
+    truck.style.left = truckX + "px";
+    truck.style.top = truckY + "px";
+});
+
+/* Truck initial position - defined after sizes are known */
+let truckX = 0, truckY = 0;
+
+/* keyboard */
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+function moveTruck() {
+    // movement step scaled to screen
+    const stepX = GAME_WIDTH * 0.02;
+    const stepY = GAME_HEIGHT * 0.02;
+
+    if(keys["ArrowLeft"]) truckX -= stepX;
+    if(keys["ArrowRight"]) truckX += stepX;
+    if(keys["ArrowUp"]) truckY -= stepY;
+    if(keys["ArrowDown"]) truckY += stepY;
+
+    truckX = Math.max(0, Math.min(GAME_WIDTH - TRUCK_WIDTH, truckX));
+    truckY = Math.max(0, Math.min(GAME_HEIGHT - TRUCK_HEIGHT, truckY));
+
+    truck.style.left = truckX + "px";
+    truck.style.top = truckY + "px";
+}
+
+/* TOUCH CONTROLS */
+let leftPressed = false, rightPressed = false;
+document.getElementById("leftBtn").addEventListener("touchstart", e=>{ e.preventDefault(); leftPressed = true; });
+document.getElementById("leftBtn").addEventListener("touchend", ()=>{ leftPressed = false; });
+document.getElementById("rightBtn").addEventListener("touchstart", e=>{ e.preventDefault(); rightPressed = true; });
+document.getElementById("rightBtn").addEventListener("touchend", ()=>{ rightPressed = false; });
+
+function touchMove() {
+    const stepX = GAME_WIDTH * 0.02;
+    if(leftPressed) truckX -= stepX;
+    if(rightPressed) truckX += stepX;
+
+    truckX = Math.max(0, Math.min(GAME_WIDTH - TRUCK_WIDTH, truckX));
+    truck.style.left = truckX + "px";
+}
+
+/* ENEMY */
+function createEnemy() {
+    if(crashed || paused) return;
+    let e = document.createElement("div"); e.className="enemy";
+    const type = Math.random() < 0.5 ? "images/enemy_car.png" : "images/enemy_bus.png";
+    e.style.backgroundImage = `url('${type}')`;
+
+    e.x = Math.random() * Math.max(0, (GAME_WIDTH - ENEMY_WIDTH));
+    e.y = -ENEMY_HEIGHT;
+    e.style.width = ENEMY_WIDTH + "px";
+    e.style.height = ENEMY_HEIGHT + "px";
+    e.style.left = e.x + "px"; e.style.top = e.y + "px";
+
+    enemies.push(e); game.appendChild(e);
+}
+
+/* FUEL */
+function createFuel() {
+    if(crashed || paused) return;
+    let f = document.createElement("div"); f.className="fuel";
+    f.x = Math.random() * Math.max(0, (GAME_WIDTH - FUEL_SIZE));
+    f.y = -FUEL_SIZE;
+    f.style.width = FUEL_SIZE + "px";
+    f.style.height = FUEL_SIZE + "px";
+    f.style.left = f.x + "px"; f.style.top = f.y + "px";
+    fuels.push(f); game.appendChild(f);
+}
+
+/* ROAD SCROLL */
+let r1 = 0, r2 = 0;
+function resetRoadPositions(){
+    r1 = 0;
+    r2 = -GAME_HEIGHT;
+    road1.style.top = r1 + "px";
+    road2.style.top = r2 + "px";
+}
+function scrollRoad() {
+    const speed = GAME_HEIGHT * 0.008; // road scroll speed
+    r1 += speed; r2 += speed;
+    if(r1 > GAME_HEIGHT) r1 = -GAME_HEIGHT;
+    if(r2 > GAME_HEIGHT) r2 = -GAME_HEIGHT;
+    road1.style.top = r1 + "px"; road2.style.top = r2 + "px";
+}
+
+/* HITBOX */
+function hit(ax, ay, aw, ah, bx, by, bw, bh){ return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by; }
+
+/* CRASH */
+function crash(){
+    if (crashed) return;
+    crashed = true;
+    crashSound.play();
+    bgMusic.pause(); bgMusic.currentTime = 0;
+
+    // stop spawners
+    clearInterval(enemyIntervalId);
+    clearInterval(fuelIntervalId);
+
+    setTimeout(()=>{ alert("CRASHED! Score: "+score); location.reload(); },500);
+}
+
+/* GAME LOOP */
+function update(){
+    if(crashed) return;
+    if(paused){ requestAnimationFrame(update); return; }
+
+    moveTruck(); touchMove(); scrollRoad();
+
+    // fuel
+    fuel -= 0.05;
+    document.getElementById("fuelBar").style.width = Math.max(0, fuel) + "%";
+    if(fuel <= 0) { fuel = 0; crash(); }
+
+    // enemies
+    for(let i = enemies.length - 1; i >= 0; i--){
+        const e = enemies[i];
+        e.y += GAME_HEIGHT * (window.enemySpeed * 0.0012); // speed scaled by selected enemySpeed
+        e.style.top = e.y + "px";
+
+        if(e.y > GAME_HEIGHT + 50){
+            // remove offscreen
+            enemies.splice(i,1);
+            e.remove();
+            score++;
+            document.getElementById("score").textContent = "Score: " + score;
+        } else if(hit(truckX, truckY, TRUCK_WIDTH, TRUCK_HEIGHT, e.x, e.y, ENEMY_WIDTH, ENEMY_HEIGHT)){
+            crash();
+            return;
+        }
+    }
+
+    // fuels
+    for(let i = fuels.length - 1; i >= 0; i--){
+        const f = fuels[i];
+        f.y += GAME_HEIGHT * 0.006;
+        f.style.top = f.y + "px";
+
+        if(f.y > GAME_HEIGHT + 50){
+            fuels.splice(i,1);
+            f.remove();
+        } else if(hit(truckX, truckY, TRUCK_WIDTH, TRUCK_HEIGHT, f.x, f.y, FUEL_SIZE, FUEL_SIZE)){
+            fuel = Math.min(100, fuel + 30);
+            f.remove(); fuels.splice(i,1);
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+/* SPAWNER IDs - will be set when level starts */
+let enemyIntervalId = null;
+let fuelIntervalId = null;
+
+function clearSpawners(){
+    if(enemyIntervalId) { clearInterval(enemyIntervalId); enemyIntervalId = null; }
+    if(fuelIntervalId) { clearInterval(fuelIntervalId); fuelIntervalId = null; }
+}
+
+/* START GAME (called by startLevel) */
+function startGame(){
+    // ensure sizes are current (game might have been hidden)
+    updateSizes();
+
+    // initialize truck position & variables
+    truckX = GAME_WIDTH / 2 - TRUCK_WIDTH / 2;
+    truckY = GAME_HEIGHT - TRUCK_HEIGHT - (GAME_HEIGHT * 0.07);
+    truck.style.left = truckX + "px";
+    truck.style.top = truckY + "px";
+
+    // reset gameplay state
+    enemies.forEach(e => e.remove()); enemies = [];
+    fuels.forEach(f => f.remove()); fuels = [];
+    score = 0; fuel = 100; crashed = false;
+    document.getElementById("score").textContent = "Score: " + score;
+    document.getElementById("fuelBar").style.width = fuel + "%";
+
+    // road reset
+    resetRoadPositions();
+
+    // clear any existing spawners (prevents duplicates)
+    clearSpawners();
+
+    // immediate spawn so player sees something quickly
+    createEnemy();
+    createFuel();
+
+    // start spawners based on spawnRate (from level)
+    enemyIntervalId = setInterval(createEnemy, Math.max(200, window.spawnRate || 1000));
+    fuelIntervalId = setInterval(createFuel, 2500);
+
+    // start game loop
+    requestAnimationFrame(update);
+
+    // start music if selected
+    if(musicSelect.value !== "none" && !bgMusic.src.includes(musicSelect.value)){
+        bgMusic.src = musicSelect.value;
+    }
+    if(!paused) bgMusic.play();
+}
+</script>
+</body>
+</html>
